@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#d4af37">
+  
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="apple-touch-icon" href="logo.png">
+  <meta name="mobile-web-app-capable" content="yes">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BarberPro SaaS</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080808">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<div id="toastWrap" class="toast-wrap"></div>
+<div id="modalYape" class="overlay-bg" style="z-index:10005;">
+  <div class="modal-sheet" style="text-align:center; padding-bottom:40px;">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:#742092; justify-content:center; font-size:24px;">
+      <i class="fas fa-qrcode"></i> Yape
+    </div>
+    <p class="modal-sub" style="margin-bottom:20px;">Apoya las futuras actualizaciones del sistema.</p>
+    
+    <div style="background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:20px;">
+      <img src="qr-yape.png" alt="QR Yape" style="width:200px; height:200px; object-fit:contain; border-radius:8px; border:1px solid #eee;">
+    </div>
+    
+    <div style="font-size:22px; font-weight:800; color:var(--text); font-family:'Space Mono', monospace; margin-bottom:4px;">
+      929 495 198
+    </div>
+    <div style="font-size:11px; color:var(--muted); margin-bottom:24px; text-transform:uppercase; letter-spacing:1px;">
+      A nombre de: Alberth Sullca</div>
+
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn btn-secondary" style="width:auto; padding:10px 40px;" onclick="document.getElementById('modalYape').style.display='none'">Cerrar</button>
+    </div>
+  </div>
+</div>
+<div id="modalConfirm" class="overlay-bg" style="align-items:center; padding:16px; z-index:10005;">
+  <div class="confirm-content">
+    <div class="confirm-icon" id="mcIcon">⚠️</div>
+    <div class="confirm-title" id="mcTitle">Confirmar</div>
+    <p class="confirm-text" id="mcText"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="cerrarConfirm()">Cancelar</button>
+      <button class="btn btn-primary" id="mcBtnConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalGasto" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--danger);"><i class="fas fa-receipt"></i> Registrar Gasto</div>
+    <p class="modal-sub">Se descontará del balance de la sucursal</p>
+    <label class="field-label">Descripción</label>
+    <input type="text" id="gDesc" class="input-control" placeholder="Ej: Cuchillas, Pago de luz...">
+    <label class="field-label">Monto (S/)</label>
+    <input type="number" id="gMonto" class="input-control" placeholder="0.00" step="0.50">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalGasto').style.display='none'">Cancelar</button>
+      <button class="btn btn-danger" onclick="procesarGasto()"><i class="fas fa-save"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalCobro" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--gold);"><i class="fas fa-cash-register"></i> Cobrar Visita</div>
+    <p class="modal-sub" id="cobroClienteNombre">Registrando servicio...</p>
+    <input type="hidden" id="mCliId"><input type="hidden" id="mCliPhone">
+    <input type="hidden" id="mCliCortes"><input type="hidden" id="mAptId">
+
+    <label class="field-label">Barbero</label>
+    <select id="mEmpId" class="input-control"></select>
+
+        <label class="field-label">Servicios (Puedes marcar varios)</label>
+    <div id="mServiciosChecklist" style="background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); padding:10px; margin-bottom:10px; max-height:120px; overflow-y:auto;">
+      </div>
+    <input type="hidden" id="mPrecio">
+
+    <div id="cobroPreview" style="background:#0a0a0a; border:1px dashed var(--border2); border-radius:var(--r); padding:16px; margin:16px 0; font-family:'Space Mono', monospace; display:none;">
+      <div style="text-align:center; font-size:10px; color:var(--muted); text-transform:uppercase; margin-bottom:12px; letter-spacing:1px;">Resumen de Transacción</div>
+      
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; color:var(--text);">Total a cobrar</span>
+        <span style="font-size:18px; color:var(--success); font-weight:700;">S/ <span id="mPrecioVisual">0.00</span></span>
+      </div>
+      
+      <div style="border-top:1px dashed var(--border2); margin:10px 0;"></div>
+      
+      <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:6px;">
+        <span style="color:var(--muted);">Comisión Barbero</span>
+        <span id="prevComision" style="color:var(--gold); font-weight:700;"></span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:11px;">
+        <span style="color:var(--muted);">Neto para la Caja</span>
+        <span id="prevNeto" style="color:var(--text2); font-weight:700;"></span>
+      </div>
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:16px; cursor:pointer;">
+      <input type="checkbox" id="mSendWa" checked style="width:16px; height:16px; accent-color:var(--gold);">
+      Enviar ticket digital por WhatsApp
+    </label>
+<label class="field-label">Cupón de Descuento (Opcional)</label>
+<div style="display:flex; gap:8px; margin-bottom:15px;">
+  <input type="text" id="mCupInput" class="input-control" placeholder="Ej: PROMO10" style="margin-bottom:0; text-transform:uppercase;">
+  <button class="btn btn-secondary btn-icon" onclick="validarCuponCobro()" style="height:44px;"><i class="fas fa-tag"></i></button>
+</div>
+<div id="cupStatusMsg" style="font-size:11px; margin-top:-10px; margin-bottom:10px; display:none;"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalCobro').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="procesarCobro()"><i class="fas fa-check"></i> Cobrar</button>
+    </div>
+  </div>
+</div>
+<div id="modalEditarCliente" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--blue);"><i class="fas fa-user-edit"></i> Editar Cliente</div>
+    <p class="modal-sub">Actualiza los datos del cliente.</p>
+    <input type="hidden" id="editCliId">
+    <label class="field-label">Nombre</label>
+    <input type="text" id="editCliName" class="input-control">
+    <label class="field-label">WhatsApp</label>
+    <input type="tel" id="editCliPhone" class="input-control">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalEditarCliente').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionCliente()"><i class="fas fa-save"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+<div id="modalHistorial" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--gold);"><i class="fas fa-history"></i> Historial (2 Meses)</div>
+    <p class="modal-sub">Cliente: <strong id="histName" style="color:var(--text);"></strong></p>
+    
+    <div id="histContent" class="scroll-list" style="max-height: 250px; margin-bottom:15px;"></div>
+    
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalHistorial').style.display='none'">Cerrar Historial</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalEditarCita" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--blue);"><i class="fas fa-edit"></i> Editar Cita</div>
+    <p class="modal-sub">Actualiza los datos si otro cliente tomará este turno.</p>
+    
+    <input type="hidden" id="editAptId">
+    <label class="field-label">Nuevo Nombre del Cliente</label>
+    <input type="text" id="editAptName" class="input-control" placeholder="Ej: Luis Torres">
+    <label class="field-label">Nuevo WhatsApp</label>
+    <input type="tel" id="editAptPhone" class="input-control" placeholder="999888777">
+    
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalEditarCita').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionCita()" style="background:var(--blue); color:#fff;"><i class="fas fa-save"></i> Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalHorario" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--gold);"><i class="fas fa-clock"></i> Horario de Trabajo</div>
+    <p class="modal-sub">Configurando a: <strong id="horarioEmpName" style="color:var(--text);"></strong></p>
+
+    <input type="hidden" id="hEmpId">
+
+    <div class="grid-2">
+      <div>
+        <label class="field-label">Hora de Entrada</label>
+        <input type="time" id="hInicio" class="input-control">
+      </div>
+      <div>
+        <label class="field-label">Hora de Salida</label>
+        <input type="time" id="hFin" class="input-control">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div style="font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-bottom:10px;">Descanso / Almuerzo</div>
+
+    <div class="grid-2">
+      <div>
+        <label class="field-label">Inicia Descanso</label>
+        <input type="time" id="dInicio" class="input-control">
+      </div>
+      <div>
+        <label class="field-label">Termina Descanso</label>
+        <input type="time" id="dFin" class="input-control">
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalHorario').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarHorarioEmpleado(this)"><i class="fas fa-save"></i> Guardar Horario</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalEditarBarbero" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--blue);"><i class="fas fa-user-edit"></i> Editar Barbero</div>
+    <p class="modal-sub">Actualiza los datos o mueve a este empleado de sede.</p>
+    
+    <input type="hidden" id="editBarbId">
+    
+    <label class="field-label">Nombre</label>
+    <input type="text" id="editBarbName" class="input-control">
+    
+    <label class="field-label">Correo del Barbero</label>
+    <input type="email" id="editBarbUser" class="input-control" style="text-transform: lowercase;">
+    
+    <div class="grid-2">
+      <div><label class="field-label">Nueva Clave</label><input type="password" id="editBarbPass" class="input-control" placeholder="Dejar en blanco..."></div>
+      <div>
+        <label class="field-label">Rol del Empleado</label>
+        <select id="editBarbRol" class="input-control">
+          <option value="barbero">Barbero</option>
+          <option value="admin">Manager (Admin)</option>
+          <option value="superadmin">Súper Admin</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <label class="field-label">Tipo de Pago</label>
+        <select id="editBarbTipoPago" class="input-control" onchange="togglePagoModo('edit')">
+          <option value="comision">Por Comisión (%)</option>
+          <option value="fijo">Fijo Diario (S/)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label" id="lblEditBarbMonto">% de Comisión</label>
+        <input type="number" id="editBarbMonto" class="input-control" min="0">
+      </div>
+    </div>
+    
+    <label class="field-label">Sede Asignada</label>
+    <select id="editBarbSede" class="input-control"></select>
+
+    <div class="divider"></div>
+    
+    <button class="btn btn-danger" onclick="eliminarBarbero()"><i class="fas fa-user-times"></i> Dar de baja (Eliminar Barbero)</button>
+    
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalEditarBarbero').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionBarbero(this)" style="background:var(--blue); color:#fff;"><i class="fas fa-save"></i> Guardar Cambios</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalNuevaSede" class="overlay-bg">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="color:var(--gold);"><i class="fas fa-store"></i> Nueva Sede</div>
+    <p class="modal-sub">Abre una nueva sucursal para tu negocio.</p>
+
+    <label class="field-label">Nombre de Sede</label>
+    <input type="text" id="newSedeNameInput" class="input-control" placeholder="Ej: Sede Sur">
+
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="document.getElementById('modalNuevaSede').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarNuevaSede(this)"><i class="fas fa-plus-circle"></i> Crear Sede</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginOverlay" class="login-overlay" style="display:flex;">
+  
+  <div class="login-container">
+    
+    <div class="login-left">
+      <div class="login-logo" style="text-align:left;">BARBER<span>PRO</span></div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:24px;">Ingresa tus credenciales para continuar.</p>
+      
+      <div style="display:flex; border-bottom:1px solid var(--border2); margin-bottom:24px;">
+        <div id="tabIngresar" onclick="switchLogin('in')" style="flex:1; padding-bottom:10px; font-weight:700; cursor:pointer; font-size:13px; color:var(--gold); border-bottom:2px solid var(--gold); text-transform:uppercase;">Ingresar</div>
+        <div id="tabRegistrar" onclick="switchLogin('up')" style="flex:1; padding-bottom:10px; font-weight:700; cursor:pointer; font-size:13px; color:var(--muted); text-transform:uppercase;">Crear Cuenta</div>
+      </div>
+
+      <div id="formIngresar">
+             <label class="field-label">Correo Electrónico</label>
+        <input type="email" id="logUser" class="input-control" placeholder="ejemplo@correo.com" autocomplete="username">
+        <label class="field-label">Contraseña</label>
+        <input type="password" id="logPass" class="input-control" placeholder="••••••" autocomplete="current-password">
+        
+        <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-bottom:20px; cursor:pointer;">
+          <input type="checkbox" id="logKeep" checked style="width:16px; height:16px; accent-color:var(--gold);"> Mantener sesión iniciada
+        </label>
+        
+        <button class="btn btn-primary" id="btnLogin" onclick="iniciarSesion()"><i class="fas fa-sign-in-alt"></i> Acceder al Sistema</button>
+      </div>
+
+            <div id="formRegistrar" style="display:none;">
+        
+        <div id="wizStep1">
+          <h3 style="font-size:16px; color:var(--text); margin-bottom:16px; font-family:'Syne';"><span style="color:var(--gold);">Paso 1:</span> Tu Negocio</h3>
+          <label class="field-label">Nombre de tu Barbería</label>
+          <input type="text" id="regLocal" class="input-control" placeholder="Ej: Barbería VIP">
+          <label class="field-label">WhatsApp (Dueño)</label>
+          <input type="tel" id="regWa" class="input-control" placeholder="999888777">
+          <button class="btn btn-primary" onclick="wizGoTo(2)">Siguiente <i class="fas fa-arrow-right"></i></button>
+        </div>
+
+        <div id="wizStep2" style="display:none;">
+          <h3 style="font-size:16px; color:var(--text); margin-bottom:16px; font-family:'Syne';"><span style="color:var(--gold);">Paso 2:</span> Tu Cuenta</h3>
+          <label class="field-label">Tu Nombre Real</label>
+          <input type="text" id="regAdminName" class="input-control" placeholder="Ej: Roberto Carlos">
+          <div class="grid-2">
+            <div>
+                            <label class="field-label">Correo Electrónico</label>
+              <input type="email" id="regUser" class="input-control" placeholder="ejemplo@correo.com">
+            </div>
+            <div>
+              <label class="field-label">Crear Clave</label>
+              <input type="password" id="regPass" class="input-control" placeholder="••••••">
+            </div>
+          </div>
+          <div class="grid-2">
+            <button class="btn btn-secondary" onclick="wizGoTo(1)">Atrás</button>
+            <button class="btn btn-primary" onclick="wizGoTo(3)">Siguiente <i class="fas fa-arrow-right"></i></button>
+          </div>
+        </div>
+
+        <div id="wizStep3" style="display:none;">
+          <h3 style="font-size:16px; color:var(--text); margin-bottom:8px; font-family:'Syne';"><span style="color:var(--gold);">Paso 3:</span> Elige tu Plan</h3>
+          <p style="font-size:11px; color:var(--muted); margin-bottom:16px;">Selecciona el plan que mejor se adapte a tu negocio. Activaremos tu cuenta al confirmar el pago.</p>
+          
+          <label class="field-label">Plan de Suscripción</label>
+          <select id="regPlan" class="input-control" style="margin-bottom:20px; font-size:14px; padding:14px;">
+            <option value="independiente">Independiente (S/ 15/mes) - 1 Sede</option>
+            <option value="equipo">Equipo (S/ 25/mes) - Hasta 2 Sedes</option>
+            <option value="empresarial">Empresarial (S/ 40/mes) - Sedes Ilimitadas</option>
+          </select>
+
+          <div class="grid-2">
+            <button class="btn btn-secondary" onclick="wizGoTo(2)">Atrás</button>
+            <button class="btn btn-primary" style="background:var(--success);" onclick="registrarSaaS()"><i class="fas fa-lock"></i> Crear y Pagar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pantallaActivacion" style="display:none; text-align:center; padding:20px 0;">
+        <i class="fas fa-exclamation-circle" style="font-size:40px; color:var(--warn); margin-bottom:16px;"></i>
+        <h2 style="font-family:'Syne'; font-size:20px; color:var(--text); margin-bottom:8px;">Cuenta Pendiente</h2>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.5;">Tu usuario <strong id="actUser" style="color:var(--gold);"></strong> ha sido creado exitosamente.<br>Para activar el plan <strong id="actPlan" style="text-transform:uppercase; color:var(--text);"></strong>, contáctanos por WhatsApp para verificar tu pago.</p>
+        <button class="btn btn-primary" style="background:#25D366; color:#fff;" onclick="contactarVentas()"><i class="fab fa-whatsapp" style="font-size:18px;"></i> Enviar Comprobante</button>
+        <button class="btn btn-secondary" style="margin-top:10px;" onclick="location.reload()">Volver al Inicio</button>
+      </div>
+        <div style="display:flex; justify-content:center; gap:20px; margin-top:30px; border-top:1px solid var(--border2); padding-top:20px;">
+        <button class="btn btn-secondary btn-sm" style="width:auto; border:none; background:transparent; color:var(--text2); font-size:12px;" onclick="abrirSoporteLogin()">
+          <i class="fas fa-headset"></i> Soporte
+        </button>
+        <button class="btn btn-secondary btn-sm" style="width:auto; border:none; background:transparent; color:var(--gold); font-size:12px;" onclick="document.getElementById('modalYape').style.display='flex'">
+          <i class="fas fa-coffee"></i> Apoyar el Proyecto
+        </button>
+      </div>
+    </div>
+
+    <div class="login-right">
+      <h2 style="font-family:'Syne'; font-size:28px; color:var(--gold); margin-bottom:10px;">Agiliza tus operaciones.</h2>
+      <p style="color:var(--muted); font-size:14px; margin-bottom:40px; max-width:80%;">Un espacio diseñado para hacer la administración de tu negocio rápida, precisa y confiable.</p>
+
+      <div class="login-feature">
+        <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+        <div class="feature-text">
+          <h4>Rápido y Fluido</h4>
+          <p>Agenda y punto de venta súper optimizados para días de alta demanda.</p>
+        </div>
+      </div>
+
+      <div class="login-feature">
+        <div class="feature-icon"><i class="fas fa-chart-pie"></i></div>
+        <div class="feature-text">
+          <h4>Información Clara</h4>
+          <p>Toma decisiones con reportes detallados y cálculo de comisiones automático.</p>
+        </div>
+      </div>
+
+      <div class="login-feature">
+        <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+        <div class="feature-text">
+          <h4>Respaldo Seguro</h4>
+          <p>La información de tus clientes y finanzas siempre disponible y protegida en la nube.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="top-nav">
+  <div class="logo">
+    <div class="logo-icon"><i class="fas fa-cut"></i></div>
+    BARBER<span>PRO</span>
+  </div>
+  <div class="nav-right">
+    <div class="user-chip" id="userChip" style="display:none; cursor:pointer;" onclick="logout()" title="Cerrar Sesión">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span id="headerUserName"></span>
+      <i class="fas fa-sign-out-alt" style="color:var(--danger); margin-left:4px; font-size:13px;"></i>
+    </div>
+  </div>
+</nav>
+
+<div id="branchBar" class="branch-bar">
+  <span class="branch-label"><i class="fas fa-store"></i> Sede</span>
+  <select id="branchSelector" class="branch-select" onchange="changeBranch()"></select>
+  <button id="branchStatusBtn" onclick="toggleEstadoSede()" class="badge badge-green" style="border:none; cursor:pointer; font-size:9px; font-family:'Outfit',sans-serif;">
+    <i class="fas fa-circle" style="font-size:7px;"></i> <span id="lblStatus">Activa</span>
+  </button>
+</div>
+
+<div class="main">
+
+  <div class="page active" id="page-agenda">
+    <div class="s-head">
+      <div class="s-title">Agenda <span>del Día</span></div>
+      <div class="s-sub" id="agendaSubtitle">Citas de la sucursal activa</div>
+    </div>
+
+        <div class="admin-only" style="margin-bottom: 16px;" id="dashboardResumen">
+      <div class="grid-2">
+        <div class="stat-card" style="background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); border-color: rgba(201,168,76,.3);">
+          <div class="stat-label" style="color:var(--gold);">💰 Ingresos de Hoy</div>
+          <div class="stat-value income" id="dashIngresos" style="font-size: 24px;">S/ 0.00</div>
+          <div class="stat-sub" id="dashServicios">0 completados</div>
+        </div>
+        <div class="stat-card" style="background: var(--surface);">
+          <div class="stat-label" style="color:var(--blue);">📅 En Espera</div>
+          <div class="stat-value" id="dashPendientes" style="color:#fff; font-size: 24px;">0</div>
+          <div class="stat-sub">Citas por atender hoy</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-tabs" id="dayTabs"></div>
+
+    <div class="card" id="newAptCard">
+      <div class="card-title"><i class="fas fa-plus-circle"></i> Nueva Cita</div>
+            <div class="grid-2">
+        <div>
+          <label class="field-label">WhatsApp (Busca Cliente)</label>
+          <input type="tel" id="aptPhone" class="input-control" placeholder="Ej: 999888777" onkeyup="buscarCliente(this.value)">
+        </div>
+        <div>
+          <label class="field-label">Nombre del Cliente</label>
+          <input type="text" id="aptClient" class="input-control" placeholder="Autocompleta...">
+        </div>
+      </div>
+      
+      <div class="grid-2">
+        <div>
+                   <label class="field-label">Servicios (Marca varios)</label>
+          <div id="aptServiciosChecklist" style="background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); padding:10px; margin-bottom:10px; max-height:100px; overflow-y:auto;"></div>
+        </div>
+        <div>
+          <label class="field-label">Barbero</label>
+          <select id="aptBarbero" class="input-control"></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-label">Fecha</label>
+          <input type="date" id="aptDate" class="input-control">
+        </div>
+        <div>
+          <label class="field-label">Hora</label>
+          <input type="time" id="aptTime" class="input-control">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addApt()"><i class="fas fa-calendar-plus"></i> Agendar Cita</button>
+    </div>
+
+    <div id="aptList"></div>
+  </div>
+
+       <div class="page" id="page-clientes">
+    <div class="s-head" style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <div class="s-title">Clientes <span>&</span> Fidelidad</div>
+        <div class="s-sub">Programa de puntos de la marca</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-secondary btn-sm" style="width:auto; margin:0; padding:8px 12px; background:var(--surface);" onclick="verHistorialGlobal()" title="Ver historial general de la sede">
+          <i class="fas fa-history"></i>
+        </button>
+        <button class="btn btn-success btn-sm" style="width:auto; margin:0;" onclick="cobrarClienteDePaso()">
+          <i class="fas fa-bolt"></i> Express
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-user-plus"></i> Registrar Cliente</div>
+      <div class="grid-2">
+        <div>
+          <label class="field-label">Nombre</label>
+          <input type="text" id="cliName" class="input-control" placeholder="Juan Pérez">
+        </div>
+        <div>
+          <label class="field-label">WhatsApp</label>
+          <input type="tel" id="cliPhone" class="input-control" placeholder="999888777">
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="addClient()"><i class="fas fa-plus"></i> Registrar</button>
+    </div>
+
+    <div class="search-wrap">
+      <i class="fas fa-search"></i>
+      <input type="text" id="cliSearch" class="input-control" placeholder="Buscar cliente por nombre..." onkeyup="filterClients()">
+    </div>
+
+    <div class="grid-2" style="margin-bottom:12px;" id="clientStats" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-label">Total clientes</div>
+        <div class="stat-value income" id="cliTotal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Premios pendientes</div>
+        <div class="stat-value profit" id="cliPremios">—</div>
+      </div>
+    </div>
+
+    <div id="cliList"></div>
+  </div>
+
+  <div class="page" id="page-metricas">
+    <div class="s-head">
+      <div class="s-title">Caja & <span>Finanzas</span></div>
+      <div class="s-sub">Balance de la sucursal seleccionada</div>
+    </div>
+
+    <div class="period-sel">
+      <button class="period-btn active" onclick="setPeriod('turno', this)">Turno Actual</button>
+      <button class="period-btn" onclick="setPeriod(7, this)">7 días</button>
+      <button class="period-btn" onclick="setPeriod(14, this)">14 días</button>
+      <button class="period-btn" onclick="setPeriod(30, this)">30 días</button>
+    </div>
+    
+    <button class="btn btn-primary" onclick="cierreDeCaja()" style="margin-bottom:14px; background:var(--gold-dim); color:var(--gold); border:1px solid rgba(201,168,76,.35); box-shadow:none;">
+      <i class="fas fa-lock"></i> Hacer Cierre de Caja de Hoy
+    </button>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label"><i class="fas fa-arrow-up" style="color:var(--success);"></i> Ingresos brutos</div>
+        <div class="stat-value income" id="mIngresos">S/ 0</div>
+        <div class="stat-sub" id="mIngresosCount">0 servicios</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label"><i class="fas fa-arrow-down" style="color:var(--danger);"></i> Egresos</div>
+        <div class="stat-value expense" id="mGastos">S/ 0</div>
+        <div class="stat-sub">Comis. + Gastos</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card" style="border-color:rgba(201,168,76,.25); background:var(--gold-dim);">
+        <div class="stat-label" style="color:var(--gold);">Ganancia neta</div>
+        <div class="stat-value profit" id="mNeto">S/ 0</div>
+        <div class="stat-sub" id="mMargen">Margen: —%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Ticket promedio</div>
+        <div class="stat-value" id="mTicket" style="color:var(--blue);">S/ 0</div>
+        <div class="stat-sub">Por servicio</div>
+      </div>
+    </div>
+
+    <button class="btn btn-danger" onclick="document.getElementById('modalGasto').style.display='flex'">
+      <i class="fas fa-minus-circle"></i> Registrar Gasto del Local
+    </button>
+
+    <div class="card" style="margin-top:4px;">
+      <div class="card-title"><i class="fas fa-chart-bar"></i> Ingresos por Día</div>
+      <div style="position:relative; height:180px; width:100%;"><canvas id="chartVentas"></canvas></div>
+    </div>
+
+    <div class="card admin-only" id="topBarberosCard">
+      <div class="card-title"><i class="fas fa-trophy"></i> Top Barberos (este período)</div>
+      <div id="topBarberosList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-list-ul"></i> Gastos Recientes</div>
+      <div id="gastosRecientesList"></div>
+    </div>
+  </div>
+
+    <div class="page" id="page-config">
+    <div class="s-head">
+      <div class="s-title">Panel de <span>Control</span></div>
+      <div class="s-sub">Configuración del sistema</div>
+    </div>
+
+    <div class="config-layout">
+      <div class="config-menu">
+        <div class="config-menu-item active" onclick="switchConfigTab('general', this)"><i class="fas fa-store"></i> General</div>
+        <div class="config-menu-item" onclick="switchConfigTab('equipo', this)"><i class="fas fa-users-cog"></i> Mi Equipo</div>
+        <div class="config-menu-item" onclick="switchConfigTab('servicios', this)"><i class="fas fa-list"></i> Servicios</div>
+        <div class="config-menu-item" onclick="switchConfigTab('marketing', this)"><i class="fas fa-star"></i> Marketing</div>
+        
+      </div> <div class="config-content">
+        <div id="cfg-general" class="config-section active">
+          <div class="card admin-only" style="border-color:rgba(59,130,246,.2);">
+            <div class="card-title"><i class="fas fa-link"></i> Link de Reservas Públicas</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div class="link-box" id="miLinkReserva">—</div>
+              <button class="btn btn-secondary btn-icon" onclick="copiarLink()"><i class="fas fa-copy"></i></button>
+              <button class="btn btn-secondary btn-icon" onclick="compartirLink()"><i class="fas fa-share-alt"></i></button>
+            </div>
+          </div>
+          
+                    <div class="card admin-only">
+            <div class="card-title"><i class="fas fa-store"></i> Información de esta Sede</div>
+            
+            <div style="background:var(--surface); padding:12px; border-radius:var(--r); margin-bottom:15px; border:1px solid var(--border2);">
+              <label class="field-label" style="color:var(--gold);">Estado de Operación</label>
+              <p style="font-size:11px; color:var(--muted); margin-bottom:10px;">Escribe el mensaje que verán tus clientes si cierras la sede (tocando el botón Activa/Cerrada de arriba):</p>
+              <textarea id="cfgSedeMsg" class="input-control" style="height:60px; resize:none; padding:10px; font-family:'Outfit';" placeholder="Ej: Cerrado por remodelación. Volvemos mañana."></textarea>
+            </div>
+
+            <div class="grid-2">
+              <div>
+                <label class="field-label">Nombre de Sede</label>
+                <input type="text" id="cfgSedeName" class="input-control">
+              </div>
+              <div>
+                <label class="field-label">Dirección (Para el cliente)</label>
+                <input type="text" id="cfgSedeAddress" class="input-control" placeholder="Ej: Av. Principal 123">
+              </div>
+            </div>
+            <button class="btn btn-secondary" onclick="updateSedeActual()"><i class="fas fa-save"></i> Guardar Cambios</button>
+            <div class="divider"></div>
+            <div style="font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase; margin-bottom:10px;">Sucursales Adicionales</div>
+            <button class="btn btn-primary" style="background:var(--card2); color:var(--gold); border:1px solid var(--gold-dim);" onclick="crearNuevaSede()"><i class="fas fa-plus-circle"></i> Abrir Nueva Sede</button>
+          </div>
+
+          <div class="card" style="border-color:rgba(59,130,246,.2);">
+            <div class="card-title" style="color:var(--blue);"><i class="fas fa-headset"></i> Soporte y Ayuda</div>
+            <p style="font-size:12px; color:var(--text2); margin-bottom:10px;">¿Necesitas ayuda con el sistema o quieres mejorar tu plan?</p>
+            <button class="btn btn-secondary" onclick="abrirSoporteGeneral()" style="color:var(--text); border-color:var(--blue-dim);">
+  <i class="fab fa-whatsapp" style="color:var(--success);"></i> Contactar Soporte
+</button>
+          </div>
+
+          <button class="btn btn-danger" onclick="logout()" style="margin-top:8px;">
+            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+          </button>
+          <p class="float-hint" style="margin-top:8px;">BarberPro SaaS · v2.0</p>
+        </div>
+
+        <div id="cfg-equipo" class="config-section">
+          <div class="card admin-only">
+            <div class="card-title"><i class="fas fa-users"></i> Barberos — Esta Sede</div>
+            <div id="barberosList" style="margin-bottom:12px;"></div>
+            <div class="divider"></div>
+            <div style="font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;">Agregar barbero</div>
+                        <div class="grid-2">
+              <div><label class="field-label">Nombre</label><input type="text" id="newBarbName" class="input-control" placeholder="Carlos López"></div>
+              <div><label class="field-label">Correo del Barbero</label><input type="email" id="newBarbUser" class="input-control" placeholder="barbero@correo.com" style="text-transform: lowercase;"></div>
+            </div>
+                        <div class="grid-2">
+              <div><label class="field-label">Contraseña</label><input type="password" id="newBarbPass" class="input-control" placeholder="••••••"></div>
+              <div>
+                <label class="field-label">Rol del Empleado</label>
+                <select id="newBarbRol" class="input-control">
+                  <option value="barbero">Barbero</option>
+                  <option value="admin">Manager (Administra esta Sede)</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div>
+                <label class="field-label">Tipo de Pago</label>
+                <select id="newBarbTipoPago" class="input-control" onchange="togglePagoModo('new')">
+                  <option value="comision">Por Comisión (%)</option>
+                  <option value="fijo">Fijo Diario (S/)</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label" id="lblNewBarbMonto">% de Comisión</label>
+                <input type="number" id="newBarbMonto" class="input-control" value="50" min="0">
+              </div>
+            </div>
+            
+            <button class="btn btn-secondary" onclick="addBarbero()"><i class="fas fa-user-plus"></i> Agregar Barbero</button>
+          </div>
+        </div>
+
+        <div id="cfg-servicios" class="config-section">
+          <div class="card admin-only">
+            <div class="card-title"><i class="fas fa-list"></i> Catálogo de Servicios</div>
+            <div class="grid-2" style="margin-bottom:10px; align-items:end;">
+              <div><label class="field-label">Servicio</label><input type="text" id="newSrvName" class="input-control" placeholder="Corte Clásico" style="margin-bottom:0;"></div>
+              <div><label class="field-label">Precio (S/)</label><input type="number" id="newSrvPrice" class="input-control" placeholder="25" style="margin-bottom:0;"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="addServicioConfig()"><i class="fas fa-plus"></i> Agregar Servicio</button>
+            <div id="cfgServiciosList" style="margin-top:10px;"></div>
+            <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:10px;"><i class="fas fa-sync-alt"></i> Guardar Catálogo</button>
+          </div>
+        </div>
+
+        <div id="cfg-marketing" class="config-section">
+          <div class="card admin-only">
+            <div class="card-title"><i class="fas fa-star"></i> Programa de Fidelidad</div>
+            
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-bottom:16px; cursor:pointer; padding-bottom:10px; border-bottom:1px solid var(--border2);">
+              <input type="checkbox" id="cfgFidelidadActiva" checked style="width:18px; height:18px; accent-color:var(--gold);" onchange="toggleFidelidadUI()">
+              Activar acumulación de puntos y premios
+            </label>
+
+            <div id="fidelidadSettings">
+              <label class="field-label">Cortes para ganar premio</label>
+              <input type="number" id="cfgRequiredCuts" class="input-control" placeholder="Ej: 6" min="1" max="30">
+              <label class="field-label">Nombre del premio</label>
+              <input type="text" id="cfgPromoName" class="input-control" placeholder="Ej: Corte Gratis">
+            </div>
+            
+            <button class="btn btn-secondary" style="margin-top:10px;" onclick="saveConfigFidelidad()"><i class="fas fa-save"></i> Guardar Programa</button>
+          </div>
+
+          <div class="card admin-only">
+            <div class="card-title"><i class="fas fa-ticket-alt"></i> Cupones de Descuento</div>
+            <div class="grid-2">
+              <div><label class="field-label">Código Promo</label><input type="text" id="newCupCode" class="input-control" placeholder="Ej: VERANO20" style="text-transform:uppercase;"></div>
+              <div>
+                <label class="field-label">Tipo y Valor</label>
+                <div style="display:flex; gap:5px;">
+                  <select id="newCupTipo" class="input-control" style="width:80px; padding:11px 5px;"><option value="porcentaje">%</option><option value="fijo">S/</option></select>
+                  <input type="number" id="newCupVal" class="input-control" placeholder="20">
+                </div>
+              </div>
+            </div>
+            <div class="grid-3">
+              <div><label class="field-label">Caducidad</label><input type="date" id="newCupDate" class="input-control"></div>
+              <div><label class="field-label">Stock Total</label><input type="number" id="newCupStock" class="input-control" placeholder="50"></div>
+              <div><label class="field-label">Uso x Cliente</label><input type="number" id="newCupLimit" class="input-control" value="1"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="crearCuponBD()"><i class="fas fa-plus"></i> Crear Cupón</button>
+            <div id="cfgCuponesList" style="margin-top:10px; max-height: 300px; overflow-y: auto;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<nav class="tab-bar">
+  <button class="tab-item active" onclick="goPage('agenda', this)"><i class="far fa-calendar-alt"></i>Agenda</button>
+  <button class="tab-item" onclick="goPage('clientes', this)"><i class="fas fa-users"></i>Clientes</button>
+  
+  <button class="tab-item" id="tabCaja" onclick="goPage('metricas', this)"><i class="fas fa-chart-bar"></i>Caja</button>
+  <button class="tab-item" id="tabConfig" onclick="goPage('config', this)"><i class="fas fa-sliders-h"></i>Config</button>
+</nav>
+
+<script src="logica.js"></script>
+</body>
+</html>

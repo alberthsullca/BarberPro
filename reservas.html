@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reserva tu Cita</title>
+<meta name="theme-color" content="#080808">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root { --bg: #080808; --surface: #101010; --card: #141414; --border: #222; --border2: #2e2e2e; --gold: #c9a84c; --gold-dim: rgba(201,168,76,.12); --text: #f0ede8; --muted: #5a564f; --success: #34c47a; --danger: #e05252; --r: 12px; --r-lg: 20px; }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:'Outfit', sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; display:flex; flex-direction:column; align-items:center; padding: 20px 16px; }
+
+/* HEADER MARCA BLANCA */
+.header { text-align:center; margin-bottom:24px; width:100%; max-width:400px; animation: fadeIn 0.5s ease; }
+.shop-name { font-family:'Syne', sans-serif; font-size:32px; font-weight:800; color:var(--gold); line-height:1.1; margin-bottom:4px; }
+.shop-branch { font-size:13px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; }
+
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg); padding:24px; width:100%; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.5); animation: slideUp 0.4s ease; }
+
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+.field-group { margin-bottom:16px; }
+.field-label { display:block; font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:6px; letter-spacing:0.05em;}
+.input-control { width:100%; background:var(--surface); border:1px solid var(--border2); color:var(--text); padding:14px; border-radius:var(--r); font-size:15px; font-family:'Outfit',sans-serif; outline:none; transition:border-color 0.2s; }
+.input-control:focus { border-color:var(--gold); }
+select.input-control { cursor:pointer; appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23c9a84c%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 14px top 50%; background-size: 10px auto; }
+
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.btn { width:100%; padding:16px; border-radius:var(--r); border:none; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-family:'Outfit',sans-serif; text-transform:uppercase; letter-spacing:0.05em; transition:transform 0.1s, background 0.2s; margin-top: 10px;}
+.btn:active { transform:scale(0.98); }
+.btn-primary { background:var(--gold); color:#000; }
+.btn-primary:hover { background:var(--gold2); }
+.btn-secondary { background:var(--card2); color:var(--text2); border:1px solid var(--border2); }
+.btn-icon { width:48px; padding:0; margin-top:0; flex-shrink:0; }
+
+/* CUADRITOS DE HORARIOS */
+.time-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 8px; margin-top: 4px; }
+.time-slot { padding: 10px 4px; border-radius: 8px; font-size: 13px; font-family: 'Space Mono', monospace; font-weight: 700; text-align: center; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; user-select: none; }
+.time-slot.available { background: rgba(52, 196, 122, 0.12); color: var(--success); border-color: rgba(52, 196, 122, 0.3); }
+.time-slot.available:active { transform: scale(0.95); }
+.time-slot.unavailable { background: rgba(224, 82, 82, 0.08); color: var(--danger); cursor: not-allowed; border-color: rgba(224, 82, 82, 0.15); opacity: 0.6; }
+.time-slot.selected { background: var(--success); color: #000; box-shadow: 0 4px 12px rgba(52, 196, 122, 0.3); border-color: var(--success); }
+
+/* PANTALLA DE SEDE CERRADA */
+#closedScreen { display:none; text-align:center; padding: 40px 20px; animation: popIn 0.5s ease; }
+.closed-icon { font-size:60px; color:var(--danger); margin-bottom:20px; }
+
+/* PANTALLA DE ÉXITO */
+#successScreen { display:none; text-align:center; padding: 40px 20px; }
+.success-icon { font-size:60px; color:var(--success); margin-bottom:20px; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+@keyframes popIn { 0% { transform: scale(0); opacity:0; } 100% { transform: scale(1); opacity:1; } }
+
+.loading-screen { position:fixed; inset:0; background:var(--bg); z-index:999; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--gold); }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading-screen">
+  <i class="fas fa-spinner fa-spin" style="font-size: 30px; margin-bottom:10px;"></i>
+  <p style="font-size:12px; font-weight:600; color:var(--muted);">Conectando...</p>
+</div>
+
+<div class="header" id="headerInfo" style="display:none;">
+  <div class="shop-name" id="uiShopName">Barbería</div>
+  
+  <div class="field-group" style="margin-top:15px; margin-bottom:10px;">
+    <select id="uiBranchSelector" class="input-control" style="font-weight:700; text-align:center; color:var(--gold); border-color:var(--gold-dim);" onchange="cambiarSedeCliente()"></select>
+  </div>
+
+  <div id="uiBranchAddress" style="font-size:13px; color:var(--muted); display:none; justify-content:center; align-items:center; gap:6px;">
+    <i class="fas fa-map-marker-alt" style="color:var(--danger);"></i> 
+    <span id="uiAddressText">Cargando dirección...</span>
+  </div>
+</div>
+
+<div class="card" id="loginCard" style="display:none; text-align:center;">
+  <i class="fab fa-whatsapp" style="font-size:40px; color:var(--success); margin-bottom:12px;"></i>
+  <h2 style="font-family:'Syne'; font-size:22px; color:var(--gold); margin-bottom:6px;">Ingresa para Reservar</h2>
+  <p style="font-size:13px; color:var(--muted); margin-bottom:20px;">Verificaremos tus puntos de fidelidad y descuentos activos.</p>
+  
+  <div class="field-group" style="text-align:left;">
+    <input type="tel" id="loginPhone" class="input-control" placeholder="Ej: 999888777" style="font-size:18px; letter-spacing:1px; text-align:center; padding:18px;">
+  </div>
+  <button class="btn btn-primary" onclick="validarCliente(this)"><i class="fas fa-arrow-right"></i> Continuar</button>
+</div>
+
+<div class="card" id="closedScreen">
+  <div class="closed-icon"><i class="fas fa-store-slash"></i></div>
+  <h2 style="font-family:'Syne'; font-size:24px; margin-bottom:10px; color:var(--gold);">Sede Fuera de Servicio</h2>
+  <p id="closedMessage" style="color:var(--text2); font-size:14px; margin-bottom:20px; line-height:1.5;"></p>
+  <div style="font-size:12px; color:var(--muted); border-top:1px solid var(--border2); padding-top:15px;">
+    Por favor, intenta con otra de nuestras sedes o vuelve más tarde.
+  </div>
+</div>
+
+<div class="card" id="bookingForm" style="display:none;">
+  
+  <div id="loyaltyBanner" style="display:none; background:var(--gold-dim); border:1px solid rgba(201,168,76,.3); border-radius:var(--r); padding:14px; margin-bottom:18px; text-align:center;">
+    <span id="loyaltyText" style="font-size:13px; color:var(--gold); font-weight:700; line-height:1.4;"></span>
+  </div>
+
+  <div class="field-group">
+    <label class="field-label">Tu Nombre</label>
+    <input type="text" id="resName" class="input-control" placeholder="Ej: Luis Torres">
+    <input type="hidden" id="resPhone">
+  </div>
+
+  <div class="field-group">
+    <label class="field-label">Selecciona tu Servicio</label>
+    <select id="resService" class="input-control" onchange="updateReservaTotal()"></select>
+  </div>
+
+  <div class="field-group">
+    <label class="field-label">¿Con quién te cortas?</label>
+    <select id="resBarber" class="input-control" onchange="cargarHorariosDisponibles()"></select>
+  </div>
+
+  <div class="grid-2 field-group">
+    <div>
+      <label class="field-label">Fecha</label>
+      <input type="date" id="resDate" class="input-control" onchange="cargarHorariosDisponibles()">
+    </div>
+    <div style="grid-column: 1 / -1;">
+      <label class="field-label">Hora (Sujeta a disp.)</label>
+      <input type="hidden" id="resTime">
+      <div id="timeGrid" class="time-grid">
+        <div style="font-size:12px; color:var(--muted); grid-column: 1 / -1; padding: 10px; text-align:center; background:var(--surface); border-radius:8px;">Selecciona fecha y barbero primero</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="field-group" style="margin-top:20px; padding-top:20px; border-top:1px dashed var(--border2);">
+    <label class="field-label">¿Tienes un código de descuento?</label>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="resCupInput" class="input-control" placeholder="Ej: VERANO20" style="margin-bottom:0; text-transform:uppercase;">
+      <button class="btn btn-secondary btn-icon" onclick="validarCuponReserva()" style="height:48px; margin-top:0;"><i class="fas fa-tag"></i></button>
+    </div>
+    <div id="resCupMsg" style="font-size:12px; margin-top:8px; display:none; font-weight:600;"></div>
+  </div>
+
+  <button class="btn btn-primary" id="btnSubmit" onclick="crearReserva()" style="margin-top:20px;">
+    <i class="far fa-calendar-check"></i> <span id="btnSubmitText">Confirmar Cita</span>
+  </button>
+</div>
+
+<div class="card" id="successScreen">
+  <div class="success-icon"><i class="fas fa-check-circle"></i></div>
+  <h2 style="font-family:'Syne'; font-size:24px; margin-bottom:10px;">¡Cita Confirmada!</h2>
+  <p style="color:var(--muted); font-size:14px; margin-bottom:20px; line-height:1.5;">Tu reserva ha sido enviada al local. Te esperamos el <strong style="color:var(--text);" id="lblSuccessDate"></strong> a las <strong style="color:var(--text);" id="lblSuccessTime"></strong>.</p>
+  <button class="btn" style="background:var(--surface); border:1px solid var(--border2); color:var(--text);" onclick="location.reload()">Hacer otra reserva</button>
+</div>
+
+<script>
+// CONEXIÓN SUPABASE
+var supabaseUrl = 'https://zosnbtcbuyjtpzmhfcwt.supabase.co';
+var supabaseKey = 'sb_publishable_dN81AGjoKYjKQrTMVb6fXQ_6VaeaJMF';
+var sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+var sucursalId = null;
+var negocioId = null;
+var configNegocio = { promoName: 'Corte Gratis', requiredCuts: 6 }; 
+var CUPON_RESERVA = null;
+var sucursalesGlobal = [];
+
+// Obtener parámetros de la URL
+const urlParams = new URLSearchParams(window.location.search);
+sucursalId = urlParams.get('sucursal');
+
+window.onload = async function() {
+  var tzOffset = (new Date()).getTimezoneOffset() * 60000;
+  var today = (new Date(Date.now() - tzOffset)).toISOString().split('T')[0];
+  document.getElementById('resDate').setAttribute('min', today);
+  document.getElementById('resDate').value = today;
+
+  if(!sucursalId) {
+    alert("Error: Link de reserva inválido (Falta la sede).");
+    return;
+  }
+  await cargarDatosLocal();
+};
+
+async function cargarDatosLocal() {
+  try {
+    var { data: sucursalInit, error: err1 } = await sb.from('sucursales').select('negocio_id').eq('id', sucursalId).single();
+    if(err1 || !sucursalInit) throw new Error("Sede no encontrada");
+    negocioId = sucursalInit.negocio_id;
+
+        var { data: negocio } = await sb.from('negocios').select('nombre_marca, configuracion, admin_whatsapp').eq('id', negocioId).single();
+    document.getElementById('uiShopName').innerText = negocio.nombre_marca;
+    configNegocio = negocio.configuracion || configNegocio;
+    
+    // Guardamos el WhatsApp del dueño globalmente
+    window.ADMIN_WA = negocio.admin_whatsapp;
+
+       // INYECTAR COLOR PERSONALIZADO (Marca Blanca)
+    if (configNegocio.themeColor) {
+      document.documentElement.style.setProperty('--gold', configNegocio.themeColor);
+      document.documentElement.style.setProperty('--gold2', configNegocio.themeColor); // Evita errores de hover
+    }
+
+    var servicios = configNegocio.servicios || [];
+    document.getElementById('resService').innerHTML = servicios.map(s => 
+      `<option value="${s.nombre}" data-precio="${s.precio}">${s.nombre} - S/${parseFloat(s.precio).toFixed(2)}</option>`
+    ).join('') || '<option value="Corte General" data-precio="0">Corte General</option>';
+
+    var { data: sucursalesLista } = await sb.from('sucursales').select('id, nombre_sucursal, direccion').eq('negocio_id', negocioId);
+    sucursalesGlobal = sucursalesLista || [];
+
+    var selSede = document.getElementById('uiBranchSelector');
+    selSede.innerHTML = sucursalesGlobal.map(s => `<option value="${s.id}">📍 Sede: ${s.nombre_sucursal}</option>`).join('');
+    selSede.value = sucursalId;
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('headerInfo').style.display = 'block';
+    document.getElementById('loginCard').style.display = 'block'; 
+
+    await cambiarSedeCliente();
+
+  } catch (error) {
+    document.getElementById('loading').innerHTML = '<i class="fas fa-exclamation-triangle" style="font-size:30px; margin-bottom:10px; color:#e05252;"></i><p>Link inválido o negocio no encontrado.</p>';
+  }
+}
+
+function formatPhone(p) { p = p.replace(/\D/g, ''); return (p.length === 9 && p.startsWith('9')) ? '51' + p : p; }
+
+async function validarCliente(btn) {
+  var phone = document.getElementById('loginPhone').value.trim();
+  if(phone.length < 8) return alert("Por favor, ingresa un número de WhatsApp válido.");
+  
+  var wpF = formatPhone(phone);
+  var textoOriginal = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+  btn.disabled = true;
+  
+  var { data } = await sb.from('clientes').select('*').eq('negocio_id', negocioId).eq('whatsapp', wpF).maybeSingle();
+  
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('bookingForm').style.display = 'block';
+  document.getElementById('resPhone').value = wpF;
+  
+  var lBanner = document.getElementById('loyaltyBanner');
+  var lText = document.getElementById('loyaltyText');
+  
+  if(data) {
+    document.getElementById('resName').value = data.nombre;
+    var rc = configNegocio.requiredCuts || 6;
+    var faltan = rc - (data.cortes_acumulados || 0);
+    
+    lBanner.style.display = 'block';
+    if(faltan > 0) {
+        lText.innerHTML = `¡Hola de nuevo, ${data.nombre.split(' ')[0]}! 👋<br>Tienes <span style="color:#fff;">${data.cortes_acumulados} puntos</span>. Faltan ${faltan} para tu premio.`;
+    } else {
+        lText.innerHTML = `¡Felicidades ${data.nombre.split(' ')[0]}! 🏆<br>Tienes tu <span style="color:#fff;">${configNegocio.promoName}</span> listo para usar en el local.`;
+    }
+  } else {
+    lBanner.style.display = 'block';
+    lText.innerHTML = "¡Primera vez con nosotros! 🎉<br>Dinos tu nombre para empezar a acumular puntos.";
+  }
+  
+  updateReservaTotal(); 
+}
+
+function updateReservaTotal() {
+   var srv = document.getElementById('resService');
+   var opt = srv.options[srv.selectedIndex];
+   var precioBase = parseFloat(opt ? opt.getAttribute('data-precio') : 0) || 0;
+   
+   var desc = 0;
+   if(CUPON_RESERVA) {
+       desc = CUPON_RESERVA.tipo === 'porcentaje' ? (precioBase * CUPON_RESERVA.valor / 100) : CUPON_RESERVA.valor;
+   }
+   var total = Math.max(0, precioBase - desc);
+   
+   var btnTxt = document.getElementById('btnSubmitText');
+   if(precioBase > 0) {
+       btnTxt.innerText = `Confirmar Cita • S/ ${total.toFixed(2)}`;
+   } else {
+       btnTxt.innerText = `Confirmar Cita`;
+   }
+}
+
+async function validarCuponReserva() {
+  var code = document.getElementById('resCupInput').value.trim().toUpperCase();
+  var msg = document.getElementById('resCupMsg');
+  if(!code) return;
+  
+  msg.style.display = 'block'; msg.style.color = 'var(--gold)'; msg.innerText = "Verificando cupón...";
+  
+  var { data: cup } = await sb.from('cupones').select('*').eq('negocio_id', negocioId).eq('codigo', code).maybeSingle();
+  
+  if (!cup) { CUPON_RESERVA = null; msg.style.color='var(--danger)'; msg.innerText="❌ Cupón no existe."; updateReservaTotal(); return; }
+  if (new Date(cup.fecha_caducidad + 'T23:59:59') < new Date()) { CUPON_RESERVA = null; msg.style.color='var(--danger)'; msg.innerText="❌ El cupón ha vencido."; updateReservaTotal(); return; }
+  if (cup.usos_actuales >= cup.stock_total) { CUPON_RESERVA = null; msg.style.color='var(--danger)'; msg.innerText="❌ Cupón agotado."; updateReservaTotal(); return; }
+
+  // Verificar límite (contamos en el historial global del negocio)
+  var wpF = document.getElementById('resPhone').value;
+  var { data: cli } = await sb.from('clientes').select('id').eq('negocio_id', negocioId).eq('whatsapp', wpF).maybeSingle();
+  
+  if (cli) {
+    var { count } = await sb.from('historial_servicios').select('*', { count: 'exact', head: true }).eq('cliente_id', cli.id).eq('cupon_codigo', code);
+    if (count >= cup.limite_por_cliente) { CUPON_RESERVA = null; msg.style.color='var(--danger)'; msg.innerText=`❌ Ya usaste este cupón (${cup.limite_por_cliente} uso máximo).`; updateReservaTotal(); return; }
+  }
+
+  CUPON_RESERVA = cup;
+  msg.style.color = 'var(--success)';
+  msg.innerText = `✅ Descuento aplicado: -${cup.tipo === 'porcentaje' ? cup.valor+'%' : 'S/'+cup.valor}`;
+  updateReservaTotal();
+}
+
+async function cambiarSedeCliente() {
+  sucursalId = document.getElementById('uiBranchSelector').value;
+  var addressDiv = document.getElementById('uiBranchAddress');
+  
+  // 1. Consultar información de esta sede específica (para ver si está activa o cerrada)
+  var { data: sedeInfo } = await sb.from('sucursales').select('activa, mensaje_cierre, direccion').eq('id', sucursalId).single();
+
+  // 2. LÓGICA DE CIERRE DE SEDE
+  if (sedeInfo && sedeInfo.activa === false) {
+    document.getElementById('bookingForm').style.display = 'none';
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('closedMessage').innerText = sedeInfo.mensaje_cierre || 'Esta sede se encuentra temporalmente cerrada.';
+    document.getElementById('closedScreen').style.display = 'block';
+    if (addressDiv) addressDiv.style.display = 'none';
+    return; // Detener todo para que no cargue barberos
+  } else {
+    // Si la sede está ABIERTA, nos aseguramos de ocultar la pantalla de error
+    document.getElementById('closedScreen').style.display = 'none';
+  }
+
+  // 3. Mostrar dirección si existe
+  if (sedeInfo && sedeInfo.direccion && sedeInfo.direccion.trim() !== '') {
+    document.getElementById('uiAddressText').innerText = sedeInfo.direccion;
+    addressDiv.style.display = 'flex';
+  } else {
+    addressDiv.style.display = 'none';
+  }
+
+  // 4. Cargar Barberos
+  document.getElementById('resBarber').innerHTML = '<option value="">Cargando barberos...</option>';
+  var { data: barberos } = await sb.from('empleados').select('id, nombre, hora_inicio, hora_fin, descanso_inicio, descanso_fin').eq('sucursal_id', sucursalId).eq('activo', true);
+  
+    // ✂️ Cargamos los barberos agregando la opción "Cualquiera" al inicio
+  var htmlBarberos = '<option value="cualquiera">✨ Cualquier Barbero (Más rápido)</option>';
+  htmlBarberos += (barberos||[]).map(b => 
+    `<option value="${b.id}" data-hi="${b.hora_inicio || '10:00'}" data-hf="${b.hora_fin || '20:00'}" data-di="${b.descanso_inicio || '14:00'}" data-df="${b.descanso_fin || '15:00'}">${b.nombre}</option>`
+  ).join('');
+  
+  document.getElementById('resBarber').innerHTML = htmlBarberos;
+  
+  cargarHorariosDisponibles(); 
+}
+
+async function cargarHorariosDisponibles() {
+  var fechaSel = document.getElementById('resDate').value;
+  var barberoSel = document.getElementById('resBarber').value;
+  var gridHoras = document.getElementById('timeGrid');
+  var inputHora = document.getElementById('resTime');
+  
+  inputHora.value = '';
+  if (!fechaSel || !barberoSel) return;
+
+  gridHoras.innerHTML = '<div style="font-size:12px; color:var(--gold); grid-column: 1 / -1; padding: 10px; text-align:center;"><i class="fas fa-spinner fa-spin"></i> Verificando disponibilidad...</div>';
+
+  var { data: todosBarberos } = await sb.from('empleados').select('*').eq('sucursal_id', sucursalId).eq('activo', true);
+  var { data: citasExistentes } = await sb.from('citas').select('hora, empleado_id').eq('sucursal_id', sucursalId).eq('fecha', fechaSel);
+
+  // Generar bloques desde las 08:00 hasta las 22:00
+  var bloquesHoras = [];
+  for (var h = 8; h < 22; h++) {
+    bloquesHoras.push((h < 10 ? '0'+h : h) + ':00:00');
+    bloquesHoras.push((h < 10 ? '0'+h : h) + ':30:00');
+  }
+
+  // 🧠 FUNCIÓN MAESTRA: Verifica si un barbero trabaja a esa hora, no está almorzando y no tiene cita
+  function barberoPuedeAtender(b, horaStr) {
+    var minStr = parseInt(horaStr.split(':')[0]) * 60 + parseInt(horaStr.split(':')[1]);
+    var minIn = parseInt((b.hora_inicio || '09:00').split(':')[0]) * 60 + parseInt((b.hora_inicio || '09:00').split(':')[1]);
+    var minOut = parseInt((b.hora_fin || '20:00').split(':')[0]) * 60 + parseInt((b.hora_fin || '20:00').split(':')[1]);
+    var minDescIn = parseInt((b.descanso_inicio || '14:00').split(':')[0]) * 60 + parseInt((b.descanso_inicio || '14:00').split(':')[1]);
+    var minDescOut = parseInt((b.descanso_fin || '15:00').split(':')[0]) * 60 + parseInt((b.descanso_fin || '15:00').split(':')[1]);
+
+    // 1. ¿Está en su turno de trabajo?
+    if (minStr < minIn || minStr >= minOut) return false;
+    // 2. ¿Está en su hora de refrigerio?
+    if (minStr >= minDescIn && minStr < minDescOut) return false;
+    // 3. ¿Ya tiene una cita?
+    var ocupado = (citasExistentes || []).some(c => c.hora === horaStr && c.empleado_id === b.id);
+    return !ocupado;
+  }
+
+  var htmlFinal = '';
+
+  bloquesHoras.forEach(hora => {
+    var horaCorta = hora.substring(0, 5);
+    var estaDisponible = false;
+    var alguienTrabajaEnEsteBloque = false;
+
+    // Verificar si mostramos el cuadro (alguien debe estar en turno, aunque esté ocupado)
+    var barberosAFiltrar = barberoSel === 'cualquiera' ? todosBarberos : todosBarberos.filter(b => b.id == barberoSel);
+    
+    alguienTrabajaEnEsteBloque = barberosAFiltrar.some(b => {
+      var m = parseInt(hora.split(':')[0]) * 60 + parseInt(hora.split(':')[1]);
+      var mIn = parseInt((b.hora_inicio || '09:00').split(':')[0]) * 60 + parseInt((b.hora_inicio || '09:00').split(':')[1]);
+      var mOut = parseInt((b.hora_fin || '20:00').split(':')[0]) * 60 + parseInt((b.hora_fin || '20:00').split(':')[1]);
+      return (m >= mIn && m < mOut); // Trabaja en este rango (sin importar si es refrigerio)
+    });
+
+    if (alguienTrabajaEnEsteBloque) {
+      estaDisponible = barberosAFiltrar.some(b => barberoPuedeAtender(b, hora));
+      
+      if (estaDisponible) {
+        htmlFinal += `<div class="time-slot available" onclick="seleccionarHora('${hora}', this)">${horaCorta}</div>`;
+      } else {
+        htmlFinal += `<div class="time-slot unavailable" title="Ocupado o en Refrigerio">${horaCorta}</div>`;
+      }
+    }
+  });
+
+  gridHoras.innerHTML = htmlFinal || '<div style="font-size:12px; color:var(--muted); grid-column: 1 / -1; padding: 10px; text-align:center;">No hay turnos configurados</div>';
+}
+
+function seleccionarHora(horaOculta, elementoHtml) {
+  document.getElementById('resTime').value = horaOculta;
+  document.querySelectorAll('.time-slot.available').forEach(el => el.classList.remove('selected'));
+  elementoHtml.classList.add('selected');
+}
+
+async function crearReserva() {
+  var srvBase = document.getElementById('resService').value;
+  var empIdOriginal = document.getElementById('resBarber').value;
+  var f = document.getElementById('resDate').value;
+  var h = document.getElementById('resTime').value;
+  var n = document.getElementById('resName').value.trim();
+  var p = document.getElementById('resPhone').value.trim();
+
+  if(!srvBase || !empIdOriginal || !f || !h || !n || !p) {
+    alert("Por favor completa todos los campos y selecciona una hora verde.");
+    return;
+  }
+
+  var btn = document.getElementById('btnSubmit');
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+  btn.disabled = true;
+
+  var barberoAsignadoId = empIdOriginal;
+  var barberoNombreParaMensaje = "Un barbero del equipo";
+
+  // 🤖 1. LÓGICA DE ASIGNACIÓN INTELIGENTE (Respeta descansos)
+  if (empIdOriginal === 'cualquiera') {
+    var { data: barberos } = await sb.from('empleados').select('*').eq('sucursal_id', sucursalId).eq('activo', true);
+    var { data: citasExistentes } = await sb.from('citas').select('hora, empleado_id').eq('sucursal_id', sucursalId).eq('fecha', f);
+    
+    // Función espejo para validar libre
+    var minStr = parseInt(h.split(':')[0]) * 60 + parseInt(h.split(':')[1]);
+    var libre = barberos.find(b => {
+      var minIn = parseInt((b.hora_inicio || '09:00').split(':')[0]) * 60 + parseInt((b.hora_inicio || '09:00').split(':')[1]);
+      var minOut = parseInt((b.hora_fin || '20:00').split(':')[0]) * 60 + parseInt((b.hora_fin || '20:00').split(':')[1]);
+      var minDescIn = parseInt((b.descanso_inicio || '14:00').split(':')[0]) * 60 + parseInt((b.descanso_inicio || '14:00').split(':')[1]);
+      var minDescOut = parseInt((b.descanso_fin || '15:00').split(':')[0]) * 60 + parseInt((b.descanso_fin || '15:00').split(':')[1]);
+
+      if (minStr < minIn || minStr >= minOut) return false;
+      if (minStr >= minDescIn && minStr < minDescOut) return false;
+      
+      var ocupado = (citasExistentes || []).some(c => c.hora === h && c.empleado_id === b.id);
+      return !ocupado;
+    });
+    
+    if (libre) {
+      barberoAsignadoId = libre.id;
+      barberoNombreParaMensaje = libre.nombre; 
+    } else {
+      alert("Lo sentimos, alguien acaba de tomar este turno. Elige otro horario.");
+      btn.innerHTML = '<i class="far fa-calendar-check"></i> <span id="btnSubmitText">Confirmar Cita</span>';
+      updateReservaTotal();
+      btn.disabled = false;
+      cargarHorariosDisponibles(); 
+      return;
+    }
+  } else {
+    barberoNombreParaMensaje = document.getElementById('resBarber').options[document.getElementById('resBarber').selectedIndex].text;
+  }
+
+  // 🚦 2. EL SEMÁFORO ANTI-DOBLE RESERVA
+  var { data: verifDoble } = await sb.from('citas').select('id').eq('fecha', f).eq('hora', h).eq('empleado_id', barberoAsignadoId);
+
+  if (verifDoble && verifDoble.length > 0) {
+    alert('❌ ¡Ups! Esa hora acaba de ser ocupada. Por favor elige otro horario.');
+    btn.innerHTML = '<i class="far fa-calendar-check"></i> <span id="btnSubmitText">Confirmar Cita</span>';
+    updateReservaTotal();
+    btn.disabled = false;
+    cargarHorariosDisponibles();
+    return;
+  }
+
+  var srvFinal = CUPON_RESERVA ? srvBase + ' (Cupón: ' + CUPON_RESERVA.codigo + ')' : srvBase;
+
+  // 💾 3. GUARDAMOS EN SUPABASE
+  var { error } = await sb.from('citas').insert([{ 
+    sucursal_id: sucursalId, 
+    empleado_id: barberoAsignadoId,
+    nombre_cliente: n, 
+    whatsapp: p, 
+    servicio: srvFinal, 
+    fecha: f, 
+    hora: h 
+  }]);
+
+  if(error) {
+    alert("Hubo un error de conexión al guardar tu cita.");
+    btn.innerHTML = '<i class="far fa-calendar-check"></i> <span id="btnSubmitText">Confirmar Cita</span>';
+    updateReservaTotal();
+    btn.disabled = false;
+    return;
+  }
+
+  // 🎉 4. PANTALLA DE ÉXITO Y WHATSAPP
+  document.getElementById('bookingForm').style.display = 'none';
+  document.getElementById('headerInfo').style.display = 'none';
+  
+  var fSplit = f.split('-');
+  var fechaAmigable = `${fSplit[2]}/${fSplit[1]}`;
+  document.getElementById('lblSuccessDate').innerText = fechaAmigable;
+  document.getElementById('lblSuccessTime').innerText = h.substring(0, 5); 
+  document.getElementById('successScreen').style.display = 'block';
+
+  if (window.ADMIN_WA) {
+    var sedeNombre = document.getElementById('uiBranchSelector').options[document.getElementById('uiBranchSelector').selectedIndex].text;
+    var msj = `Hola, acabo de agendar una cita en ${sedeNombre}:\n\n📅 Fecha: ${fechaAmigable}\n⏰ Hora: ${h.substring(0, 5)}\n✂️ Servicio: ${srvFinal}\n💈 Barbero: ${barberoNombreParaMensaje}\n👤 Mi nombre es: ${n}\n\nQuedo a la espera de su confirmación.`;
+    window.open(`https://wa.me/${window.ADMIN_WA}?text=${encodeURIComponent(msj)}`, '_blank');
+  }
+}
+</script>
+</body>
+</html>
