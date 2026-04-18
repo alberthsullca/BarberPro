@@ -272,7 +272,7 @@ function changeBranch() {
   CURRENT_SUCURSAL = document.getElementById('branchSelector').value;
   var urlActual = window.location.href.split('?')[0].replace('index.html', '');
   if (!urlActual.endsWith('/')) urlActual += '/';
-  document.getElementById('miLinkReserva').innerText = urlActual + 'reservas.html?sucursal=' + CURRENT_SUCURSAL;
+  document.getElementById('miLinkReserva').innerText = urlActual + 'reservas?sucursal=' + CURRENT_SUCURSAL;
   
   loadBarberosConfig();
   loadSedeConfig();
